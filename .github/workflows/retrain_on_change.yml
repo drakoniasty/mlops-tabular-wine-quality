@@ -66,7 +66,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Add project root to PYTHONPATH
+          run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+
       - name: Run training
-        env:
-          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
-        run: python -m ARISA_DSML.train
+          env: 
+            MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          run: python -m ARISA_DSML.train
