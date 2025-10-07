@@ -62,10 +62,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Add project root to PYTHONPATH
+        run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+
       - name: Resolve champion/challenger
         env:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
-        run: python ARISA_DSML/resolve.py
+        run: python -m ARISA_DSML.resolve
 
       - name: Run predictions
         env:
