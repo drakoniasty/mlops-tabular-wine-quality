@@ -67,7 +67,7 @@ def preprocess_all()->None:
         # Ensure consistent column order across splits
         df = df.reindex(sorted(df.columns), axis=1)
         df.to_csv(PROCESSED_DATA_DIR / out_name, index=False)
-        logger.info(f\"Saved processed -> {PROCESSED_DATA_DIR / out_name} (shape={df.shape})\")
+        logger.info(f"Saved processed -> {PROCESSED_DATA_DIR / out_name} (shape={df.shape})")
 
 if __name__ == "__main__":
     logger.info(f"RAW_DATA_DIR: {RAW_DATA_DIR}")
