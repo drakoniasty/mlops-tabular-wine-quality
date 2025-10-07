@@ -1,47 +1,45 @@
-#################################################################################
-# GLOBALS                                                                       #
-#################################################################################
+# ===== Makefile for Bank Marketing MLflow Project =====
 
-PROJECT_NAME = titanic-survival-classification
-PYTHON_VERSION = 3.11
-PYTHON_INTERPRETER = python
+PYTHON := python
+PIP := $(PYTHON) -m pip
 
-#################################################################################
-# COMMANDS                                                                      #
-#################################################################################
+# ========= BASIC SETUP =========
 
-## Install Python Dependencies
-.PHONY: requirements
+.PHONY: requirements preprocess train predict resolve lint clean
+
+# Install dependencies
 requirements:
-	$(PYTHON_INTERPRETER) -m pip install -U pip
-	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
+	$(PIP) install --upgrade pip
+	$(PIP) install -r requirements.txt
 
-## Delete all compiled Python files
-.PHONY: clean
-clean:
-	find . -type f -name "*.py[co]" -delete
-	find . -type d -name "__pycache__" -delete
-
-## Lint using flake8 and black (use `make format` to do formatting)
-.PHONY: lint
+# Run linting checks
 lint:
-	flake8 ARISA_DSML
+	flake8 .
+	black --check .
 
-all:
-	requirements clean lint
+# ========= PIPELINE =========
 
-.PHONY: preprocess
+# Step 1: preprocess all CSVs in data/raw -> data/processed
 preprocess:
-	python -m ARISA_DSML.preproc
+	$(PYTHON) ARISA_DSML/preproc.py
 
-.PHONY: train
+# Step 2: train model and log to MLflow
 train:
-	python -m ARISA_DSML.train
+	MLFLOW_TRACKING_URI=$$MLFLOW_TRACKING_URI \
+	$(PYTHON) ARISA_DSML/train.py
 
-.PHONY: resolve
+# Step 3: resolve MLflow champion/challenger before predictions
 resolve:
-	python -m ARISA_DSML.resolve
+	MLFLOW_TRACKING_URI=$$MLFLOW_TRACKING_URI \
+	$(PYTHON) ARISA_DSML/resolve.py
 
-.PHONY: predict
+# Step 4: run predictions on processed test.csv
 predict:
-	python -m ARISA_DSML.predict
+	MLFLOW_TRACKING_URI=$$MLFLOW_TRACKING_URI \
+	$(PYTHON) ARISA_DSML/predict.py
+
+# ========= UTILITIES =========
+
+# Remove artifacts and temporary files
+clean:
+	rm -rf __pycache__ .pytest_cache models/*.pkl models/*.cbm models/preds.csv reports/figures/*.png
