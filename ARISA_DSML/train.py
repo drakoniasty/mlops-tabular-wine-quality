@@ -125,6 +125,13 @@ def train_full(X, y, categorical_indices, params, cv_results=None, artifact_name
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     model_path = MODELS_DIR / artifact_name
     model.save_model(model_path)
+    import mlflow.catboost
+
+    mlflow.catboost.log_model(
+        cb,
+        artifact_path="model",
+        registered_model_name=MODEL_NAME
+    )
     joblib.dump({"feature_columns": list(X.columns), "params": params}, MODELS_DIR / "model_params.pkl")
 
     # Plot (if cv provided)
