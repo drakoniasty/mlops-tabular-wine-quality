@@ -3,7 +3,7 @@ from pathlib import Path
 from loguru import logger
 import pandas as pd
 
-from ARISA_DSML.config import PROCESSED_DATA_DIR, RAW_DATA_DIR, target, categorical
+from config import PROCESSED_DATA_DIR, RAW_DATA_DIR, target, categorical
 
 def _read_csv_any(path: Path) -> pd.DataFrame:
     # Try comma first (as seen in your files), then semicolon fallback.
