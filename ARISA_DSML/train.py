@@ -176,4 +176,4 @@ if __name__ == "__main__":
         X_all, y_all = X_train, y_train
 
     model_path = train_full(X_all, y_all, categorical_indices, params, cv_results=cv_results)
-    print(f\"Model saved to: {model_path}\")
+    print(f"Model saved to: {model_path}")
