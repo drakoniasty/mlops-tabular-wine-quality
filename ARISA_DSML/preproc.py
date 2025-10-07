@@ -1,86 +1,74 @@
-"""Functions for preprocessing the data."""
-
 import os
 from pathlib import Path
-import re
-import zipfile
-
-from kaggle.api.kaggle_api_extended import KaggleApi
 from loguru import logger
 import pandas as pd
 
-from ARISA_DSML.config import DATASET, DATASET_TEST, PROCESSED_DATA_DIR, RAW_DATA_DIR
+from ARISA_DSML.config import PROCESSED_DATA_DIR, RAW_DATA_DIR, target, categorical
 
+def _read_csv_any(path: Path) -> pd.DataFrame:
+    # Try comma first (as seen in your files), then semicolon fallback.
+    try:
+        df = pd.read_csv(path, sep=",")
+        if df.shape[1] == 1:
+            df = pd.read_csv(path, sep=";")
+    except Exception:
+        df = pd.read_csv(path, sep=";")
+    return df
 
-def get_raw_data(dataset:str=DATASET, dataset_test:str=DATASET_TEST)->None:
-    api = KaggleApi()
-    api.authenticate()
+def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    # Strip spaces from column names
+    df.columns = [c.strip() for c in df.columns]
+    return df
 
-    download_folder = Path(RAW_DATA_DIR)
-    zip_path = download_folder / "titanic.zip"
+def _ensure_target_binary(df: pd.DataFrame) -> pd.DataFrame:
+    if target in df.columns:
+        # Map typical yes/no to 1/0, keep numeric if already numeric
+        if df[target].dtype == "object":
+            df[target] = df[target].str.strip().str.lower().map({"yes": 1, "no": 0}).fillna(df[target])
+        # If still not numeric, try to coerce
+        if not pd.api.types.is_numeric_dtype(df[target]):
+            df[target] = pd.to_numeric(df[target], errors="ignore")
+    return df
 
-    logger.info(f"RAW_DATA_DIR is: {RAW_DATA_DIR}")
-    api.competition_download_files(dataset, path=str(download_folder))
-    api.dataset_download_files(dataset_test, path=str(download_folder), unzip=True)
+def _basic_clean(df: pd.DataFrame) -> pd.DataFrame:
+    df = _normalize_columns(df)
+    df = _ensure_target_binary(df)
 
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(str(download_folder))
+    # Convert obvious numeric columns if present
+    for col in ["age","balance","day","duration","campaign","pdays","previous"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    Path.unlink(zip_path)
+    # Minimal NA handling
+    for col in df.columns:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            df[col] = df[col].fillna(df[col].median())
+        else:
+            df[col] = df[col].astype(str).str.strip().replace({"nan": None}).fillna("unknown")
 
+    return df
 
-def extract_title(name:str)-> str|None:
-    """Extract title from passenger name."""
-    match = re.search(r",\s*([\w\s]+)\.", name)
-
-    return match.group(1) if match else None
-
-
-def preprocess_df(file:str|Path)->str|Path:
-    """Preprocess datasets."""
-    _, file_name = os.path.split(file)
-    df_data = pd.read_csv(file)
-    df_data = df_data.drop(columns=["Ticket"])
-
-    df_data["Title"] = df_data["Name"].apply(extract_title)
-
-    # pattern to match a letter followed by a number
-    cabin_pattern = r"([A-Za-z]+)(\d+)"
-
-    # run pattern on Cabin to extract all matches
-    matches = df_data["Cabin"].str.extractall(cabin_pattern)
-    matches = matches.reset_index()
-
-    # create a new column for each letter and number matched
-    result = matches.pivot(index="level_0", columns="match", values=[0, 1])
-    result.columns = [f"{col[0]}_{col[1]}" for col in result.columns]
-
-    # join to original train dataframe
-    df_data = df_data.join(result[["0_0", "1_0"]])
-
-    # fill nans
-    df_data["1_0"] = df_data["1_0"].astype(float)
-    df_data = df_data.fillna({"0_0": "N", "1_0": df_data["1_0"].mean()})
-    df_data["1_0"] = df_data["1_0"].astype(int)
-
-    # rename new columns and drop old ones
-    df_data = df_data.rename(columns={"0_0": "Deck", "1_0": "CabinNumber"})
-    df_data = df_data.drop(columns=["Cabin", "Name"], axis=1)
-    df_data = df_data.fillna({"Embarked": "N", "Age": df_data["Age"].mean()})
+def preprocess_all()->None:
     PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    outfile_path = PROCESSED_DATA_DIR / file_name
-    df_data.to_csv(outfile_path, index=False)
 
-    return outfile_path
+    files = {
+        "train.csv": RAW_DATA_DIR / "bank-full.csv",
+        "val.csv": RAW_DATA_DIR / "bank-full copy.csv",
+        "test.csv": RAW_DATA_DIR / "bank-full copy 2.csv",
+    }
 
+    for out_name, in_path in files.items():
+        if not in_path.exists():
+            logger.error(f"Missing input file: {in_path}")
+            continue
+        df = _read_csv_any(in_path)
+        df = _basic_clean(df)
 
-if __name__=="__main__":
-    # get the train and test sets from default location
-    logger.info("getting datasets")
-    get_raw_data()
+        # Ensure consistent column order across splits
+        df = df.reindex(sorted(df.columns), axis=1)
+        df.to_csv(PROCESSED_DATA_DIR / out_name, index=False)
+        logger.info(f\"Saved processed -> {PROCESSED_DATA_DIR / out_name} (shape={df.shape})\")
 
-    # preprocess both sets
-    logger.info("preprocessing train.csv")
-    preprocess_df(RAW_DATA_DIR / "train.csv")
-    logger.info("preprocessing test.csv")
-    preprocess_df(RAW_DATA_DIR / "test.csv")
+if __name__ == "__main__":
+    logger.info(f"RAW_DATA_DIR: {RAW_DATA_DIR}")
+    preprocess_all()

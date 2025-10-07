@@ -1,6 +1,5 @@
-"""Config file for module."""
+"""Config file for module (Bank Marketing version)."""
 from pathlib import Path
-
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -10,9 +9,6 @@ load_dotenv()
 # Paths
 PROJ_ROOT = Path(__file__).resolve().parents[1]
 logger.info(f"PROJ_ROOT path is: {PROJ_ROOT}")
-
-DATASET = "titanic"  # original competition dataset
-DATASET_TEST = "wesleyhowe/titanic-labelled-test-set"  # test set augmented with target labels
 
 DATA_DIR = PROJ_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
@@ -25,14 +21,15 @@ MODELS_DIR = PROJ_ROOT / "models"
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 
-MODEL_NAME = "titanic-surv-bclass"
+# Bank Marketing configuration
+MODEL_NAME = "bank-marketing-bclass"
 
+# Target column in provided CSVs
+target = "Target"
+
+# Default categorical columns expected in bank marketing dataset
+# (will also be auto-detected at runtime; this list is a fallback/order hint)
 categorical = [
-    "Pclass",
-    "Sex",
-    "Embarked",
-    "Deck",
-    "Title",
+    "job","marital","education","default","housing","loan",
+    "contact","month","poutcome"
 ]
-
-target = "Survived"
