@@ -1,27 +1,47 @@
-.PHONY: setup data split featurize train eval all lint test
+#################################################################################
+# GLOBALS                                                                       #
+#################################################################################
 
-setup:
-	pip install -r requirements.txt
+PROJECT_NAME = titanic-survival-classification
+PYTHON_VERSION = 3.11
+PYTHON_INTERPRETER = python
 
+#################################################################################
+# COMMANDS                                                                      #
+#################################################################################
+
+## Install Python Dependencies
+.PHONY: requirements
+requirements:
+	$(PYTHON_INTERPRETER) -m pip install -U pip
+	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
+
+## Delete all compiled Python files
+.PHONY: clean
+clean:
+	find . -type f -name "*.py[co]" -delete
+	find . -type d -name "__pycache__" -delete
+
+## Lint using flake8 and black (use `make format` to do formatting)
+.PHONY: lint
 lint:
-	ruff check . && black --check .
+	flake8 ARISA_DSML
 
-test:
-	pytest -q
+all:
+	requirements clean lint
 
-data:
-	python -m src.data.download
+.PHONY: preprocess
+preprocess:
+	python -m ARISA_DSML.preproc
 
-split:
-	python -m src.data.split
-
-featurize:
-	python -m src.features.preproc
-
+.PHONY: train
 train:
-	python -m src.models.train
+	python -m ARISA_DSML.train
 
-eval:
-	python -m src.models.evaluate
+.PHONY: resolve
+resolve:
+	python -m ARISA_DSML.resolve
 
-all: data split featurize train eval
+.PHONY: predict
+predict:
+	python -m ARISA_DSML.predict
