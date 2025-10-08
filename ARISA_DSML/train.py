@@ -126,7 +126,10 @@ def train_full(X, y, categorical_indices, params, cv_results=None, artifact_name
     model_path = MODELS_DIR / artifact_name
     model.save_model(model_path)
     import mlflow.catboost
+    from pathlib import Path
 
+    Path("models").mkdir(parents=True, exist_ok=True)
+    joblib.dump(study.best_params, best_params_path)
     mlflow.catboost.log_model(
         cb,
         artifact_path="model",
