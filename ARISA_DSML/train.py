@@ -111,7 +111,14 @@ def plot_error_scatter(df_plot, x="iterations", y="test-F1-mean", err="test-F1-s
     fig.write_image((FIGURES_DIR / f"{y}_vs_{x}.png"))
     return fig
 
-def train_full(X, y, categorical_indices, params, cv_results=None, artifact_name="catboost_bank.cbm"):
+def train_full(X, y, categorical_indices, params, cv_results=None, study=None, artifact_name="catboost_bank.cbm"):
+    """
+    Trenuje finalny model CatBoost z podanymi parametrami i zapisuje wyniki:
+    - model .cbm
+    - najlepsze parametry (jeśli przekazano study)
+    - parametry modelu i kolumny cech
+    """
+    # Ustawienia modelu
     params = {**(params or {})}
     params.update({
         "loss_function": "Logloss",
@@ -120,24 +127,38 @@ def train_full(X, y, categorical_indices, params, cv_results=None, artifact_name
         "random_seed": 42,
         "verbose": 100
     })
+
+    # Trening modelu
     model = CatBoostClassifier(**params)
     model.fit(X, y, cat_features=categorical_indices, verbose=100, early_stopping_rounds=200)
+
+    # Utworzenie katalogu models/
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Zapis modelu
     model_path = MODELS_DIR / artifact_name
     model.save_model(model_path)
-    import mlflow.catboost
-    from pathlib import Path
+    print(f"[OK] Model saved to: {model_path}")
 
-    Path("models").mkdir(parents=True, exist_ok=True)
-    joblib.dump(study.best_params, best_params_path)
+    # Jeśli study istnieje → zapisz najlepsze parametry
+    if study is not None:
+        best_params_path = MODELS_DIR / "best_params.pkl"
+        joblib.dump(study.best_params, best_params_path)
+        print(f"[OK] Saved best Optuna parameters to: {best_params_path}")
+        mlflow.log_params(study.best_params)
+
+    # Zapis metadanych modelu
+    joblib.dump({"feature_columns": list(X.columns), "params": params}, MODELS_DIR / "model_params.pkl")
+
+    # Logowanie modelu do MLflow
     mlflow.catboost.log_model(
-        cb,
+        model,
         artifact_path="model",
         registered_model_name=MODEL_NAME
     )
-    joblib.dump({"feature_columns": list(X.columns), "params": params}, MODELS_DIR / "model_params.pkl")
+    print(f"[OK] Logged model {MODEL_NAME} to MLflow registry")
 
-    # Plot (if cv provided)
+    # Wykres walidacji krzyżowej (jeśli dostępny)
     if cv_results is not None and len(cv_results):
         try:
             fig = plot_error_scatter(
